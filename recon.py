@@ -1,30 +1,85 @@
+from scipy.ndimage import rotate
 import cv2
 import glob
 import numpy as np
-from scipy.ndimage import rotate
+import os
 
-# Fonction laminogram sans les .geo
+
+def transform_into_binary(image_path, new_image_path):
+    # Charger l'image d'origine en noir et blanc
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+
+    # Enlever le vignetting
+    height, width = img.shape
+    kernel_x = cv2.getGaussianKernel(width, 750)
+    kernel_y = cv2.getGaussianKernel(height, 750)
+    kernel = kernel_y * kernel_x.T
+    mask = 255 * kernel / np.linalg.norm(kernel)
+    mask += 1-mask.max()
+    vignette = img/mask
+    vignette[vignette>255] = 255
+
+    # Ajuster le gamme pour augmenter le contraste
+    gamma = 255*(vignette/255)**(10)
+    gamma = gamma.astype(np.uint8)
+    contr = cv2.normalize(gamma, None, 0, 255, cv2.NORM_MINMAX)
+
+    # Appliquer la méthode d'Otsu pour trouver l'objet
+    _, th = cv2.threshold(contr, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Inverser le canal S pour les parties sombres/noires
+    th = cv2.bitwise_not(th)
+
+    # Appliquer la fermeture morphologique pour combler les espaces entre les carrés
+    kernel = np.ones((5, 5), np.uint8)
+    closed_th = cv2.morphologyEx(th, cv2.MORPH_CLOSE, kernel)
+
+    # Appliquer une fermeture morphologique pour combler les petits espaces
+    # Utiliser un noyau plus grand pour combler des trous plus grands
+    kernel = np.ones((15, 15), np.uint8)
+    closed = cv2.morphologyEx(closed_th, cv2.MORPH_CLOSE, kernel)
+
+    # Trouver les contours de la figure noire
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Vérifier s'il y a des contours détectés
+    if contours:
+        # Trouver le contour avec la plus grande aire
+        largest_contour = max(contours, key=cv2.contourArea)
+
+        # Créer un fond noir de la même taille que l'image d'origine
+        height, width = closed.shape
+        black_background = np.zeros((height, width), dtype=np.uint8)
+
+        # Dessiner la plus grande figure blanche sur le fond noir
+        cv2.drawContours(black_background, [largest_contour], -1, (255), thickness=cv2.FILLED)  # Dessiner en blanc
+        black_background = cv2.resize(black_background, (0, 0), fx=0.5, fy=0.5, interpolation=cv2.INTER_NEAREST)
+
+        # Sauvegarder l'image résultante
+        cv2.imwrite(new_image_path, black_background)
+        #print("L'image avec la plus grande figure blanche sur fond noir a été sauvegardée avec succès.")
+
+        return black_background
+    else:
+        print("Erreur: Aucun contour détecté dans l'image.")
+
 
 def laminogram(sinogram):
     # Calculer les paramètres à partir du sinograme
-    nbprj, nbpix = sinogram.shape # il faut peut être inverser nbprj et nbpix, j'ai pas testé
+    nbprj, nbpix = sinogram.shape
     
     # Initialiser une image vide
     image = np.ones((nbpix, nbpix))
 
     # Comme la deuxième moitié des projections est symétrique,
     # on peut traiter de seulement la première moitié
-    # Le code assume un nombre impair de projections et que la première et la dernière sont au même angle
-    #
-    # On pourrait au lieu faire un sinograme avec une rotation de 180 degrés
-    #
-    for i in range(nbprj//2+1):
+    for i in range(nbprj):
         # Répéter la projection sur plusieurs colonnes
         # pour l'étaler  sur toute l'image à reconstruire
         sinogram_image = np.tile(sinogram[i], (nbpix, 1))
 
         # Tourne la projection étalée selon l'angle à laquelle elle a été prise
-        rotated_list = rotate(sinogram_image, 360*i/(nbprj-1), reshape=False, order=0)
+        rotated_list = rotate(sinogram_image, 180*i/nbprj, reshape=False, order=0)
 
         # Ajouter les listes tournées
         image *= rotated_list
@@ -32,27 +87,44 @@ def laminogram(sinogram):
     return image
 
 
-images = np.array([cv2.imread(file, cv2.IMREAD_GRAYSCALE) for file in glob.glob("Images/*.png")])/255
-# sans boucle, test rapide
-image_final = laminogram(images[:,220,:])
-print(image_final)
-#cv2.imshow("Title", image_final)
+# Chemin du dossier contenant les photos de Rubik's cubes
+input_folder = 'Images' # a changer suivant le dossier des photos
+output_folder = 'Images_binaire' # nom dossier phiotos traitées
+recon_folder = 'Images_recon' # nom dossier reconstruction
 
-#print(image_final.shape)
+# Créer le dossier de sortie s'il n'existe pas
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
 
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+# Parcourir toutes les images dans le dossier
+images_binaires = []
 
-for i in range(0,480,10):
-    
-    image_final = laminogram(images[:,i,:])
-    #print(image_final)
-    cv2.imshow("Title", image_final)
-    #cv2.waitKey(0)
+for filename in os.listdir(input_folder):
+    if filename.lower().endswith((".jpg", ".jpeg", ".png")):
+        # Charger l'image
+        input_path = os.path.join(input_folder, filename)
+        output_path = os.path.join(output_folder, filename)
+        images_binaires.append(transform_into_binary(input_path, output_path))
 
-    #cv2.destroyAllWindows()
-    #print(images[:,i,:])
-    
+images_binaires = np.array(images_binaires)/255
+
+# Singlethreading
+"""
+for i in range(0, images_binaires.shape[1], 25):
+    image_recon = laminogram(images_binaires[:,i,:])
+    output_path = os.path.join(recon_folder, f"couche_{i}.JPG")
+    cv2.imwrite(output_path, image_recon*255)
+"""
+
+# Multithreading
+import concurrent.futures
 
 
+def thread_function(i, sinogram):
+    image_recon = laminogram(sinogram)
+    output_path = os.path.join(recon_folder, f"couche_{i}.JPG")
+    cv2.imwrite(output_path, image_recon*255)
 
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    executor.map(thread_function, range(images_binaires.shape[-1]), [images_binaires[:, i, :] for i in range(images_binaires.shape[1])])
