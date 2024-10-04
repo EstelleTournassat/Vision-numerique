@@ -79,7 +79,7 @@ def laminogram(sinogram):
         sinogram_image = np.tile(sinogram[i], (nbpix, 1))
 
         # Tourne la projection étalée selon l'angle à laquelle elle a été prise
-        rotated_list = rotate(sinogram_image, 180*i/nbprj, reshape=False, order=0)
+        rotated_list = rotate(sinogram_image, 360*i/nbprj, reshape=False, order=0)
 
         # Ajouter les listes tournées
         image *= rotated_list
