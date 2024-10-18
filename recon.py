@@ -19,7 +19,7 @@ def transform_into_binary(image_path, new_image_path):
     vignette = img/mask
     vignette[vignette>255] = 255
 
-    # Ajuster le gamme pour augmenter le contraste
+    # Ajuster le gamma pour augmenter le contraste
     gamma = 255*(vignette/255)**(10)
     gamma = gamma.astype(np.uint8)
     contr = cv2.normalize(gamma, None, 0, 255, cv2.NORM_MINMAX)
