@@ -39,30 +39,10 @@ def transform_into_binary(image_path, new_image_path):
     kernel = np.ones((15, 15), np.uint8)
     closed = cv2.morphologyEx(closed_th, cv2.MORPH_CLOSE, kernel)
 
-    # Trouver les contours de la figure noire
-    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Vérifier s'il y a des contours détectés
-    if contours:
-        # Trouver le contour avec la plus grande aire
-        largest_contour = max(contours, key=cv2.contourArea)
-
-        # Créer un fond noir de la même taille que l'image d'origine
-        height, width = closed.shape
-        black_background = np.zeros((height, width), dtype=np.uint8)
-
-        # Dessiner la plus grande figure blanche sur le fond noir
-        cv2.drawContours(black_background, [largest_contour], -1, (255), thickness=cv2.FILLED)  # Dessiner en blanc
-        black_background = cv2.resize(black_background, (0, 0), fx=0.5, fy=0.5, interpolation=cv2.INTER_NEAREST)
-
-        # Sauvegarder l'image résultante
-        cv2.imwrite(new_image_path, black_background)
-        #print("L'image avec la plus grande figure blanche sur fond noir a été sauvegardée avec succès.")
-
-        return black_background
-    else:
-        print("Erreur: Aucun contour détecté dans l'image.")
-
+    # Sauvegarder l'image résultante
+    cv2.imwrite(new_image_path, closed)
+    #print("L'image avec la plus grande figure blanche sur fond noir a été sauvegardée avec succès.")
+    return True
 
 def laminogram(sinogram):
     # Calculer les paramètres à partir du sinograme
