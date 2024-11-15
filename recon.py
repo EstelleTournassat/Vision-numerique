@@ -42,7 +42,8 @@ def transform_into_binary(image_path, new_image_path):
     # Sauvegarder l'image résultante
     cv2.imwrite(new_image_path, closed)
     #print("L'image avec la plus grande figure blanche sur fond noir a été sauvegardée avec succès.")
-    return True
+    closed = cv2.resize(closed, (0, 0), fx=0.5, fy=0.5, interpolation=cv2.INTER_NEAREST)
+    return closed
 
 def laminogram(sinogram):
     # Calculer les paramètres à partir du sinograme
