@@ -3,6 +3,9 @@ import cv2
 import glob
 import numpy as np
 import os
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.cm as cm
 
 
 def transform_into_binary(image_path, new_image_path):
@@ -116,3 +119,70 @@ def thread_function(i, sinogram):
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
     executor.map(thread_function, range(images_binaires.shape[-1]), [images_binaires[:, i, :] for i in range(images_binaires.shape[1])])
+
+# Graphe 3D
+
+images_input_3D = 'Images_recon'
+
+# Liste pour stocker les images binaires
+images = []
+
+# Trier les fichiers dans le dossier images_input par ordre numérique décroissant
+sorted_files = sorted(
+    os.listdir(images_input_3D),
+    key=lambda x: int(''.join(filter(str.isdigit, x))),  # Extraire le nombre pour le tri
+    reverse=True  # Ordre décroissant
+)
+
+# Parcourir le dossier et charger les images binaires
+for filename in sorted_files:
+    if filename.lower().endswith((".jpg", ".jpeg", ".png")):
+        input_path = os.path.join(images_input_3D, filename)
+        # Lire l'image en niveaux de gris et la convertir en binaire
+        img = cv2.imread(input_path, cv2.IMREAD_GRAYSCALE)
+        #cv2.imshow('graycsale image',img)
+        if img is not None:
+            # Assumer que l'image contient uniquement 0 et 1 ou 0 et 255
+            img_binaire = (img > 0).astype(int)  # Convertir les valeurs 255 en 1 si nécessaire
+            images.append(img_binaire)
+
+
+# Création de la figure 3D
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.set_facecolor('white')  # Fond blanc pour un meilleur contraste
+
+# Boucle pour placer chaque pixel de chaque image dans le graphe 3D
+num_images = len(images)
+cmap = cm.viridis  # Choisir une carte de couleurs pour la profondeur
+
+for i, img in enumerate(images):
+    h, w = img.shape
+    x, y = np.meshgrid(np.arange(w), np.arange(h))
+    z = np.full_like(x, i)  # Chaque image correspond à une valeur z (profondeur)
+
+    # Créer un gradient de couleurs basé sur la profondeur
+    colors = cmap(i / num_images)
+
+    # Masque pour la matière
+    mask = img == 1  # Les pixels représentant la matière
+
+    # Sous-échantillonnage : garder 1 pixel sur 5000
+    indices = np.flatnonzero(mask)  # Indices linéaires des pixels valides
+    selected_indices = np.random.choice(indices, size=len(indices) // 100, replace=False)  # Sous-échantillonner de 1/100 image
+    final_mask = np.zeros_like(mask, dtype=bool)
+    final_mask.flat[selected_indices] = True  # Construire un masque final
+
+    # Afficher uniquement les pixels sous-échantillonnés
+    ax.scatter(x[final_mask], y[final_mask], z[final_mask], c=[colors], marker='o', s=1, alpha=0.6)
+
+
+
+# Paramètres de visualisation
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+ax.set_title('Reconstruction 3D de l\'objet avec visualisation améliorée')
+
+plt.show()
+
