@@ -9,7 +9,7 @@ import matplotlib.cm as cm
 
 
 def transform_into_binary(image_path, new_image_path):
-    # Charger l'image d'origine en noir et blanc
+    # Charger l'image d'origine en noir et en blanc
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
     # Enlever le vignetting
