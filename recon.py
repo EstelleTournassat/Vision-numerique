@@ -80,7 +80,14 @@ if not os.path.exists(output_folder):
 # Parcourir toutes les images dans le dossier
 images_binaires = []
 
-for filename in os.listdir(input_folder):
+# Trier les fichiers en ordre numérique décroissant
+sorted_files = sorted(
+    os.listdir(input_folder),
+    key=lambda x: int(''.join(filter(str.isdigit, x))) if any(char.isdigit() for char in x) else -1,
+    reverse=True
+)
+
+for filename in sorted_files:
     if filename.lower().endswith((".jpg", ".jpeg", ".png")):
         # Charger l'image
         input_path = os.path.join(input_folder, filename)
