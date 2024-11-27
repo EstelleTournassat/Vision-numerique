@@ -186,3 +186,71 @@ ax.set_title('Reconstruction 3D de l\'objet avec visualisation améliorée')
 
 plt.show()
 
+import os
+import numpy as np
+import cv2
+from skimage import measure
+from stl import mesh
+
+def load_images_as_volume(input_folder):
+    """
+    Charge les images PNG binaires dans un volume 3D.
+    
+    Args:
+        input_folder (str): Chemin vers le dossier contenant les images PNG.
+
+    Returns:
+        numpy.ndarray: Volume 3D (H, W, D) avec les valeurs 0 (fond) et 1 (objet).
+    """
+    # Liste des fichiers dans le dossier, triée par ordre numérique
+    sorted_files = sorted(
+    os.listdir(input_folder),
+    key=lambda x: int(''.join(filter(str.isdigit, x))),  # Extraire le nombre pour le tri
+    reverse=True # Ordre décroissant
+    )
+
+    # Charger chaque image et l'ajouter à la pile
+    volume = []
+    for filename in sorted_files:
+        if filename.lower().endswith((".jpg", ".jpeg", ".png")):
+            img_path = os.path.join(input_folder, filename)
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            # Normaliser l'image pour qu'elle soit binaire (0 ou 1)
+            binary_img = (img > 127).astype(np.uint8)
+            volume.append(binary_img)
+
+    # Convertir en un tableau 3D (H, W, D)
+    return np.stack(volume, axis=-1)
+
+def create_3d_model_from_volume(volume, voxel_size=1.0, output_file="model.stl"):
+    """
+    Convertit un volume 3D en un fichier STL en utilisant Marching Cubes.
+    
+    Args:
+        volume (numpy.ndarray): Tableau 3D (H, W, D) binaire avec l'objet en 1.
+        voxel_size (float): Taille d'un voxel (optionnel, par défaut 1.0).
+        output_file (str): Nom du fichier STL de sortie.
+    """
+    # Utiliser Marching Cubes pour extraire la surface
+    verts, faces, normals, _ = measure.marching_cubes(volume, level=0, spacing=(voxel_size, voxel_size, voxel_size))
+
+    # Créer une structure pour le fichier STL
+    object_mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(faces):
+        for j in range(3):
+            object_mesh.vectors[i][j] = verts[face[j], :]
+
+    # Sauvegarder le modèle STL
+    object_mesh.save(output_file)
+    print(f"Modèle 3D sauvegardé dans {output_file}")
+
+# Chemin vers le dossier contenant les images binaires PNG
+input_folder = images_input_3D
+output_file = "model_3D_final.stl"  # Nom du fichier STL
+
+# Charger les images et créer le volume 3D
+volume = load_images_as_volume(input_folder)
+
+# Générer le fichier STL à partir du volume
+create_3d_model_from_volume(volume, voxel_size=1, output_file=output_file)
+
