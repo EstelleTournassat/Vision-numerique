@@ -34,18 +34,18 @@ def transform_into_binary(image_path, new_image_path):
     th = cv2.bitwise_not(th)
 
     # Appliquer la fermeture morphologique pour combler les espaces entre les carrés
-    kernel = np.ones((5, 5), np.uint8)
-    closed_th = cv2.morphologyEx(th, cv2.MORPH_CLOSE, kernel)
+    kernel = np.ones((7, 7), np.uint8)
+    closed = cv2.morphologyEx(th, cv2.MORPH_CLOSE, kernel)
 
     # Appliquer une fermeture morphologique pour combler les petits espaces
     # Utiliser un noyau plus grand pour combler des trous plus grands
-    kernel = np.ones((15, 15), np.uint8)
-    closed = cv2.morphologyEx(closed_th, cv2.MORPH_CLOSE, kernel)
+    #kernel = np.ones((15, 15), np.uint8)
+    #closed = cv2.morphologyEx(closed, cv2.MORPH_CLOSE, kernel)
 
     # Sauvegarder l'image résultante
     cv2.imwrite(new_image_path, closed)
     #print("L'image avec la plus grande figure blanche sur fond noir a été sauvegardée avec succès.")
-    closed = cv2.resize(closed, (0, 0), fx=0.5, fy=0.5, interpolation=cv2.INTER_NEAREST)
+    #closed = cv2.resize(closed, (0, 0), fx=0.5, fy=0.5, interpolation=cv2.INTER_NEAREST)
     return closed
 
 def laminogram(sinogram):
